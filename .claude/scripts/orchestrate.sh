@@ -831,6 +831,455 @@ update_memory() {
 }
 
 # =============================================
+# VERIFICAÇÃO E QUALIDADE
+# =============================================
+
+verify_worktree() {
+    local name=$1
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 verify <worktree>"
+        return 1
+    fi
+
+    local worktree_path="../${PROJECT_NAME}-$name"
+    local errors=0
+    local warnings=0
+
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║           VERIFICAÇÃO: $name${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    # 1. Verificar se worktree existe
+    if ! dir_exists "$worktree_path"; then
+        log_error "Worktree não encontrada: $worktree_path"
+        return 1
+    fi
+
+    # 2. Verificar DONE.md
+    echo -e "${YELLOW}[1/5] Verificando DONE.md...${NC}"
+    if file_exists "$worktree_path/DONE.md"; then
+        log_success "DONE.md existe"
+
+        # Verificar seções obrigatórias
+        local has_summary=$(grep -c "## Resumo\|## Summary" "$worktree_path/DONE.md" 2>/dev/null || echo 0)
+        local has_files=$(grep -c "## Arquivos\|## Files" "$worktree_path/DONE.md" 2>/dev/null || echo 0)
+        local has_test=$(grep -c "## Como Testar\|## Test\|## Testing" "$worktree_path/DONE.md" 2>/dev/null || echo 0)
+
+        [[ $has_summary -eq 0 ]] && { log_warn "DONE.md sem seção de Resumo"; ((warnings++)); }
+        [[ $has_files -eq 0 ]] && { log_warn "DONE.md sem seção de Arquivos"; ((warnings++)); }
+        [[ $has_test -eq 0 ]] && { log_warn "DONE.md sem seção de Testes"; ((warnings++)); }
+    else
+        log_error "DONE.md não encontrado"
+        ((errors++))
+    fi
+
+    # 3. Verificar arquivos pendentes
+    echo -e "${YELLOW}[2/5] Verificando arquivos pendentes...${NC}"
+    local uncommitted=$(cd "$worktree_path" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    if [[ $uncommitted -gt 0 ]]; then
+        log_warn "$uncommitted arquivo(s) não commitado(s)"
+        ((warnings++))
+        cd "$worktree_path" && git status --short
+        cd - > /dev/null
+    else
+        log_success "Todos os arquivos commitados"
+    fi
+
+    # 4. Verificar se há BLOCKED.md
+    echo -e "${YELLOW}[3/5] Verificando bloqueios...${NC}"
+    if file_exists "$worktree_path/BLOCKED.md"; then
+        log_error "Tarefa está BLOQUEADA"
+        cat "$worktree_path/BLOCKED.md"
+        ((errors++))
+    else
+        log_success "Sem bloqueios"
+    fi
+
+    # 5. Verificar linter/testes se existirem
+    echo -e "${YELLOW}[4/5] Verificando testes...${NC}"
+    local has_tests=false
+
+    if file_exists "$worktree_path/package.json"; then
+        local test_script=$(cd "$worktree_path" && grep -o '"test":\s*"[^"]*"' package.json 2>/dev/null || echo "")
+        if [[ -n "$test_script" ]] && [[ "$test_script" != *"no test"* ]]; then
+            has_tests=true
+            log_info "Encontrado: npm test"
+            if (cd "$worktree_path" && npm test --if-present 2>/dev/null); then
+                log_success "Testes passaram"
+            else
+                log_error "Testes falharam"
+                ((errors++))
+            fi
+        fi
+    fi
+
+    if file_exists "$worktree_path/Makefile"; then
+        if grep -q "^test:" "$worktree_path/Makefile" 2>/dev/null; then
+            has_tests=true
+            log_info "Encontrado: make test"
+        fi
+    fi
+
+    if ! $has_tests; then
+        log_info "Nenhum script de teste encontrado"
+    fi
+
+    # 6. Verificar commits
+    echo -e "${YELLOW}[5/5] Verificando commits...${NC}"
+    local commit_count=$(cd "$worktree_path" && git rev-list --count HEAD ^main 2>/dev/null || echo 0)
+    log_info "$commit_count commit(s) desde main"
+
+    # Resumo
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    if [[ $errors -eq 0 ]] && [[ $warnings -eq 0 ]]; then
+        echo -e "${GREEN}✅ VERIFICAÇÃO APROVADA${NC}"
+        return 0
+    elif [[ $errors -eq 0 ]]; then
+        echo -e "${YELLOW}⚠️  VERIFICAÇÃO COM AVISOS: $warnings aviso(s)${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ VERIFICAÇÃO FALHOU: $errors erro(s), $warnings aviso(s)${NC}"
+        return 1
+    fi
+}
+
+verify_all() {
+    local failed=0
+    local passed=0
+
+    for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        local name=$(basename "$task_file" .md)
+
+        if verify_worktree "$name"; then
+            ((passed++))
+        else
+            ((failed++))
+        fi
+    done
+
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "📊 RESUMO: ✅ $passed aprovadas | ❌ $failed reprovadas"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    [[ $failed -eq 0 ]]
+}
+
+review_worktree() {
+    local name=$1
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 review <worktree>"
+        return 1
+    fi
+
+    local worktree_path="../${PROJECT_NAME}-$name"
+    local review_name="review-$name"
+    local review_path="../${PROJECT_NAME}-$review_name"
+
+    if ! dir_exists "$worktree_path"; then
+        log_error "Worktree não encontrada: $worktree_path"
+        return 1
+    fi
+
+    if ! file_exists "$worktree_path/DONE.md"; then
+        log_error "Worktree não está concluída (sem DONE.md)"
+        return 1
+    fi
+
+    log_step "Criando review para: $name"
+
+    # Obter branch da worktree original
+    local source_branch=$(cd "$worktree_path" && git branch --show-current)
+
+    # Criar worktree de review
+    create_worktree "$review_name" --preset review --from "$source_branch"
+
+    # Criar tarefa de review
+    local review_task="$ORCHESTRATION_DIR/tasks/$review_name.md"
+
+    cat > "$review_task" << EOF
+# 🔍 Review: $name
+
+## Objetivo
+Revisar o código desenvolvido na worktree \`$name\` e identificar problemas.
+
+## Branch Sendo Revisada
+\`$source_branch\`
+
+## O Que Revisar
+
+### 1. Qualidade de Código
+- [ ] Código segue boas práticas
+- [ ] Sem code smells óbvios
+- [ ] Nomes de variáveis/funções claros
+- [ ] Funções não muito longas
+
+### 2. Segurança
+- [ ] Sem vulnerabilidades óbvias
+- [ ] Inputs validados
+- [ ] Sem secrets hardcoded
+
+### 3. Arquitetura
+- [ ] Segue padrões do projeto
+- [ ] Separação de responsabilidades
+- [ ] Dependências adequadas
+
+### 4. Testes
+- [ ] Testes existem para funcionalidade crítica
+- [ ] Testes fazem sentido
+
+## Arquivos para Revisar
+$(cd "$worktree_path" && git diff --name-only main 2>/dev/null | sed 's/^/- /')
+
+## Entregáveis
+Criar REVIEW.md com:
+- Lista de problemas encontrados (críticos, médios, baixos)
+- Sugestões de melhoria
+- Aprovação ou rejeição
+
+EOF
+
+    log_success "Review criada: $review_name"
+    log_info "Execute: $0 start $review_name"
+}
+
+pre_merge() {
+    log_step "Executando verificações pré-merge..."
+
+    local all_passed=true
+    local worktrees=()
+
+    # Listar worktrees
+    for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        local name=$(basename "$task_file" .md)
+        [[ "$name" == review-* ]] && continue  # Ignorar reviews
+        worktrees+=("$name")
+    done
+
+    if [[ ${#worktrees[@]} -eq 0 ]]; then
+        log_error "Nenhuma worktree encontrada"
+        return 1
+    fi
+
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║                    PRÉ-MERGE CHECK                                  ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════════╝${NC}"
+
+    # 1. Verificar todas as worktrees
+    echo ""
+    echo -e "${YELLOW}[1/3] Verificando worktrees...${NC}"
+    for name in "${worktrees[@]}"; do
+        if ! verify_worktree "$name" > /dev/null 2>&1; then
+            log_error "$name: verificação falhou"
+            all_passed=false
+        else
+            log_success "$name: verificação OK"
+        fi
+    done
+
+    # 2. Verificar conflitos potenciais
+    echo ""
+    echo -e "${YELLOW}[2/3] Verificando conflitos potenciais...${NC}"
+
+    local all_files=""
+    for name in "${worktrees[@]}"; do
+        local worktree_path="../${PROJECT_NAME}-$name"
+        local files=$(cd "$worktree_path" && git diff --name-only main 2>/dev/null)
+        all_files="$all_files"$'\n'"$files"
+    done
+
+    local duplicates=$(echo "$all_files" | sort | uniq -d | grep -v '^$' || true)
+
+    if [[ -n "$duplicates" ]]; then
+        log_warn "Arquivos modificados em múltiplas worktrees:"
+        echo "$duplicates" | while read -r file; do
+            [[ -n "$file" ]] && echo "  - $file"
+        done
+        echo ""
+        log_info "Pode haver conflitos no merge. Revise manualmente."
+    else
+        log_success "Sem arquivos conflitantes"
+    fi
+
+    # 3. Simular merge
+    echo ""
+    echo -e "${YELLOW}[3/3] Simulando merge...${NC}"
+
+    local temp_branch="pre-merge-test-$(date +%s)"
+    git checkout -b "$temp_branch" main 2>/dev/null
+
+    local merge_ok=true
+    for name in "${worktrees[@]}"; do
+        local branch="feature/$name"
+        if ! git merge --no-commit --no-ff "$branch" 2>/dev/null; then
+            log_error "Conflito detectado ao mergear: $branch"
+            merge_ok=false
+            git merge --abort 2>/dev/null || true
+        else
+            git reset --hard HEAD 2>/dev/null
+        fi
+    done
+
+    git checkout main 2>/dev/null
+    git branch -D "$temp_branch" 2>/dev/null
+
+    if $merge_ok; then
+        log_success "Simulação de merge OK"
+    else
+        all_passed=false
+    fi
+
+    # Resumo
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    if $all_passed; then
+        echo -e "${GREEN}✅ PRÉ-MERGE APROVADO - Pode fazer merge${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ PRÉ-MERGE FALHOU - Corrija os problemas antes do merge${NC}"
+        return 1
+    fi
+}
+
+generate_report() {
+    log_step "Gerando relatório consolidado..."
+
+    local report_file="$ORCHESTRATION_DIR/REPORT_$(date '+%Y%m%d_%H%M%S').md"
+
+    cat > "$report_file" << EOF
+# 📊 Relatório de Desenvolvimento
+
+> **Gerado em**: $(date '+%Y-%m-%d %H:%M:%S')
+> **Projeto**: $PROJECT_NAME
+
+---
+
+## 📋 Resumo Executivo
+
+EOF
+
+    local total=0
+    local done=0
+    local blocked=0
+
+    for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        local name=$(basename "$task_file" .md)
+        local worktree_path="../${PROJECT_NAME}-$name"
+
+        ((total++))
+
+        if file_exists "$worktree_path/DONE.md"; then
+            ((done++))
+        elif file_exists "$worktree_path/BLOCKED.md"; then
+            ((blocked++))
+        fi
+    done
+
+    cat >> "$report_file" << EOF
+| Métrica | Valor |
+|---------|-------|
+| Total de Worktrees | $total |
+| Concluídas | $done |
+| Bloqueadas | $blocked |
+| Em progresso | $((total - done - blocked)) |
+
+---
+
+## 🔧 Detalhes por Worktree
+
+EOF
+
+    for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        local name=$(basename "$task_file" .md)
+        local worktree_path="../${PROJECT_NAME}-$name"
+
+        echo "### $name" >> "$report_file"
+        echo "" >> "$report_file"
+
+        # Agentes usados
+        if file_exists "$worktree_path/.claude/AGENTS_USED"; then
+            echo "**Agentes**: $(cat "$worktree_path/.claude/AGENTS_USED")" >> "$report_file"
+            echo "" >> "$report_file"
+        fi
+
+        # Status
+        if file_exists "$worktree_path/DONE.md"; then
+            echo "**Status**: ✅ Concluída" >> "$report_file"
+            echo "" >> "$report_file"
+
+            # Incluir conteúdo do DONE.md
+            echo "<details>" >> "$report_file"
+            echo "<summary>📄 DONE.md</summary>" >> "$report_file"
+            echo "" >> "$report_file"
+            cat "$worktree_path/DONE.md" >> "$report_file"
+            echo "" >> "$report_file"
+            echo "</details>" >> "$report_file"
+        elif file_exists "$worktree_path/BLOCKED.md"; then
+            echo "**Status**: 🚫 Bloqueada" >> "$report_file"
+            echo "" >> "$report_file"
+            echo '```' >> "$report_file"
+            cat "$worktree_path/BLOCKED.md" >> "$report_file"
+            echo '```' >> "$report_file"
+        else
+            echo "**Status**: 🔄 Em progresso" >> "$report_file"
+        fi
+
+        # Commits
+        echo "" >> "$report_file"
+        echo "**Commits**:" >> "$report_file"
+        if dir_exists "$worktree_path"; then
+            (cd "$worktree_path" && git log --oneline main..HEAD 2>/dev/null | head -10 | sed 's/^/- /') >> "$report_file"
+        fi
+        echo "" >> "$report_file"
+
+        # Arquivos modificados
+        echo "**Arquivos Modificados**:" >> "$report_file"
+        if dir_exists "$worktree_path"; then
+            (cd "$worktree_path" && git diff --name-only main 2>/dev/null | head -20 | sed 's/^/- /') >> "$report_file"
+        fi
+        echo "" >> "$report_file"
+        echo "---" >> "$report_file"
+        echo "" >> "$report_file"
+    done
+
+    # Instruções de teste consolidadas
+    cat >> "$report_file" << EOF
+
+## 🧪 Instruções de Teste Consolidadas
+
+EOF
+
+    for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+        [[ -f "$task_file" ]] || continue
+        local name=$(basename "$task_file" .md)
+        local worktree_path="../${PROJECT_NAME}-$name"
+
+        if file_exists "$worktree_path/DONE.md"; then
+            local test_section=$(sed -n '/## Como Testar/,/^##/p' "$worktree_path/DONE.md" 2>/dev/null | head -n -1)
+            if [[ -n "$test_section" ]]; then
+                echo "### $name" >> "$report_file"
+                echo "$test_section" >> "$report_file"
+                echo "" >> "$report_file"
+            fi
+        fi
+    done
+
+    log_success "Relatório gerado: $report_file"
+    echo ""
+    cat "$report_file"
+}
+
+# =============================================
 # HELP
 # =============================================
 
@@ -876,6 +1325,13 @@ MEMÓRIA:
   show-memory               Ver memória
   update-memory             Atualizar memória
 
+VERIFICAÇÃO E QUALIDADE:
+  verify <worktree>         Verificar worktree (DONE.md, commits, testes)
+  verify-all                Verificar todas as worktrees
+  review <worktree>         Criar worktree de review com agentes especializados
+  pre-merge                 Verificar tudo antes do merge (conflitos, validação)
+  report                    Gerar relatório consolidado de todas as worktrees
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 PRESETS DE AGENTES:
@@ -896,24 +1352,29 @@ EXEMPLO COMPLETO:
 
   # 1. Inicializar
   ./orchestrate.sh init
-  
-  # 2. Instalar agentes
-  .claude/scripts/agents.sh install-preset auth
-  .claude/scripts/agents.sh install-preset api
-  
-  # 3. Criar worktrees com agentes especializados
+
+  # 2. Criar worktrees com agentes especializados
   ./orchestrate.sh setup auth --preset auth
   ./orchestrate.sh setup api --preset api
-  
-  # 4. Criar tarefas em .claude/orchestration/tasks/
-  
-  # 5. Iniciar
+
+  # 3. Criar tarefas em .claude/orchestration/tasks/
+
+  # 4. Iniciar
   ./orchestrate.sh start
-  
-  # 6. Monitorar
+
+  # 5. Monitorar
   ./orchestrate.sh wait
-  
-  # 7. Finalizar
+
+  # 6. Verificar qualidade
+  ./orchestrate.sh verify-all
+  ./orchestrate.sh pre-merge
+  ./orchestrate.sh report
+
+  # 7. (Opcional) Criar review
+  ./orchestrate.sh review auth
+  ./orchestrate.sh start review-auth
+
+  # 8. Finalizar
   ./orchestrate.sh merge
   ./orchestrate.sh cleanup
 
@@ -974,10 +1435,17 @@ main() {
         # Memória
         show-memory) show_memory ;;
         update-memory) update_memory ;;
-        
+
+        # Verificação e Qualidade
+        verify) verify_worktree "$1" ;;
+        verify-all) verify_all ;;
+        review) review_worktree "$1" ;;
+        pre-merge) pre_merge ;;
+        report) generate_report ;;
+
         # Help
         help|--help|-h) show_help ;;
-        
+
         *)
             log_error "Comando desconhecido: $cmd"
             show_help
