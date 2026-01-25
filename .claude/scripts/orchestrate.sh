@@ -555,7 +555,7 @@ COMECE AGORA!"
 
     # Executar
     ensure_dir "$ORCHESTRATION_DIR/pids"
-    nohup claude -p "$full_prompt" --workdir "$worktree_path" > "$logfile" 2>&1 &
+    (cd "$worktree_path" && nohup claude --dangerously-skip-permissions -p "$full_prompt" > "$logfile" 2>&1) &
     
     local pid=$!
     echo $pid > "$pidfile"
