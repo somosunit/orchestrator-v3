@@ -1,0 +1,166 @@
+#!/bin/bash
+# =============================================
+# COMMAND: start/stop/restart - Controle de agentes
+# =============================================
+
+cmd_start() {
+    local names=("$@")
+
+    # Se nenhum nome especificado, iniciar todos
+    if [[ ${#names[@]} -eq 0 ]]; then
+        for task_file in "$ORCHESTRATION_DIR/tasks"/*.md; do
+            [[ -f "$task_file" ]] || continue
+            names+=("$(basename "$task_file" .md)")
+        done
+    fi
+
+    if [[ ${#names[@]} -eq 0 ]]; then
+        log_error "Nenhuma tarefa encontrada em $ORCHESTRATION_DIR/tasks/"
+        return 1
+    fi
+
+    log_step "Iniciando ${#names[@]} agente(s)..."
+
+    for name in "${names[@]}"; do
+        start_single_agent "$name"
+        sleep 2
+    done
+}
+
+start_single_agent() {
+    local name=$1
+    local worktree_path="../${PROJECT_NAME}-$name"
+    local task_file="$ORCHESTRATION_DIR/tasks/$name.md"
+
+    # Validações
+    validate_name "$name" "agente" || return 1
+
+    if ! dir_exists "$worktree_path"; then
+        log_error "Worktree não encontrada: $name"
+        log_info "Crie com: $0 setup $name --preset <preset>"
+        return 1
+    fi
+
+    if ! file_exists "$task_file"; then
+        log_error "Tarefa não encontrada: $task_file"
+        return 1
+    fi
+
+    validate_task_file "$task_file" || return 1
+
+    # Ler agentes especializados
+    local specialized_agents=""
+    if file_exists "$worktree_path/.claude/AGENTS_USED"; then
+        specialized_agents=$(cat "$worktree_path/.claude/AGENTS_USED")
+    fi
+
+    # Ler tarefa
+    local task=$(cat "$task_file")
+
+    # Ler contexto do projeto
+    local project_context=""
+    if file_exists "$MEMORY_FILE"; then
+        project_context=$(head -50 "$MEMORY_FILE")
+    fi
+
+    # Construir prompt
+    local full_prompt="# CONTEXTO
+
+Você é um agente executor com expertise em: $specialized_agents
+
+## Instruções Base
+$(cat "$worktree_path/.claude/CLAUDE.md" 2>/dev/null || cat "$CLAUDE_DIR/AGENT_CLAUDE.md" 2>/dev/null || echo "")
+
+## Expertise Especializada
+"
+
+    # Adicionar conteúdo dos agentes
+    for agent in $specialized_agents; do
+        local agent_file="$worktree_path/.claude/agents/$agent.md"
+        if file_exists "$agent_file"; then
+            full_prompt+="
+### $agent
+$(cat "$agent_file")
+"
+        fi
+    done
+
+    full_prompt+="
+## Contexto do Projeto
+$project_context
+
+## SUA TAREFA
+$task
+
+---
+INSTRUÇÕES FINAIS:
+1. Leia a tarefa acima com atenção
+2. Crie PROGRESS.md imediatamente
+3. Execute passo a passo
+4. Faça commits frequentes: git commit -m 'feat($name): desc'
+5. Crie DONE.md quando terminar
+
+COMECE AGORA!"
+
+    # Registrar evento
+    echo "[$(timestamp)] STARTING: $name [agents: $specialized_agents]" >> "$EVENTS_FILE"
+
+    # Iniciar processo
+    start_agent_process "$name" "$worktree_path" "$full_prompt"
+}
+
+cmd_stop() {
+    local name=$1
+    local force=${2:-false}
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 stop <agente> [--force]"
+        return 1
+    fi
+
+    if [[ "$name" == "--force" ]] || [[ "$2" == "--force" ]]; then
+        force=true
+        [[ "$name" == "--force" ]] && name=$2
+    fi
+
+    stop_agent_process "$name" "$force"
+
+    # Registrar evento
+    echo "[$(timestamp)] STOPPED: $name" >> "$EVENTS_FILE"
+}
+
+cmd_restart() {
+    local name=$1
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 restart <agente>"
+        return 1
+    fi
+
+    cmd_stop "$name" true
+    sleep 2
+    start_single_agent "$name"
+}
+
+cmd_logs() {
+    local name=$1
+    local lines=${2:-50}
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 logs <agente> [linhas]"
+        return 1
+    fi
+
+    show_agent_logs "$name" "$lines"
+}
+
+cmd_follow() {
+    local name=$1
+
+    if [[ -z "$name" ]]; then
+        log_error "Uso: $0 follow <agente>"
+        return 1
+    fi
+
+    follow_agent_logs "$name"
+}

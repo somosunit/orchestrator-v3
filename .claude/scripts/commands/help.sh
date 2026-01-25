@@ -1,0 +1,106 @@
+#!/bin/bash
+# =============================================
+# COMMAND: help
+# =============================================
+
+cmd_help() {
+    cat << 'EOF'
+
+ORQUESTRADOR DE AGENTES CLAUDE v3.1
+   Com Agentes Especializados
+
+Uso: orchestrate.sh <comando> [argumentos]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AGENTES:
+  agents list               Listar agentes disponíveis
+  agents install <agente>   Instalar agente
+  agents install-preset <p> Instalar preset de agentes
+  agents installed          Ver agentes instalados
+
+INICIALIZAÇÃO:
+  init                      Criar estrutura
+  init-sample               Copiar exemplos de tarefas
+  doctor                    Diagnosticar problemas
+  doctor --fix              Corrigir problemas automaticamente
+
+EXECUÇÃO:
+  setup <nome> [opções]     Criar worktree com agentes
+    --preset <preset>       Usar preset de agentes
+    --agents <a1,a2,a3>     Especificar agentes
+    --from <branch>         Branch de origem
+
+  start [agentes]           Iniciar agentes
+  stop <agente> [--force]   Parar agente
+  restart <agente>          Reiniciar agente
+
+MONITORAMENTO:
+  status                    Ver status (formato texto)
+  status --json             Ver status (formato JSON)
+  wait [intervalo]          Aguardar conclusão
+  logs <agente> [n]         Ver últimas n linhas de log
+  follow <agente>           Seguir logs em tempo real
+
+VERIFICAÇÃO E QUALIDADE:
+  verify <worktree>         Verificar worktree
+  verify-all                Verificar todas as worktrees
+  review <worktree>         Criar worktree de review
+  pre-merge                 Verificar antes do merge
+  report                    Gerar relatório consolidado
+
+FINALIZAÇÃO:
+  merge [branch]            Fazer merge (default: main)
+  cleanup                   Limpar worktrees (arquiva artefatos)
+
+MEMÓRIA:
+  show-memory               Ver memória do projeto
+  update-memory             Atualizar timestamp da memória
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRESETS DE AGENTES:
+  auth      → backend-developer, security-auditor, typescript-pro
+  api       → api-designer, backend-developer, test-automator
+  frontend  → frontend-developer, react-specialist, ui-designer
+  fullstack → fullstack-developer, typescript-pro, test-automator
+  mobile    → mobile-developer, flutter-expert, ui-designer
+  devops    → devops-engineer, kubernetes-specialist, terraform-engineer
+  data      → data-engineer, data-scientist, postgres-pro
+  ml        → ml-engineer, ai-engineer, mlops-engineer
+  security  → security-auditor, penetration-tester, security-engineer
+  review    → code-reviewer, architect-reviewer, security-auditor
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXEMPLO COMPLETO:
+
+  # 1. Inicializar
+  ./orchestrate.sh init
+  ./orchestrate.sh doctor
+
+  # 2. Criar worktrees
+  ./orchestrate.sh setup auth --preset auth
+  ./orchestrate.sh setup api --preset api
+
+  # 3. Criar tarefas
+  ./orchestrate.sh init-sample
+
+  # 4. Iniciar
+  ./orchestrate.sh start
+
+  # 5. Monitorar
+  ./orchestrate.sh status
+  ./orchestrate.sh wait
+
+  # 6. Verificar qualidade
+  ./orchestrate.sh verify-all
+  ./orchestrate.sh pre-merge
+  ./orchestrate.sh report
+
+  # 7. Finalizar
+  ./orchestrate.sh merge
+  ./orchestrate.sh cleanup
+
+EOF
+}
