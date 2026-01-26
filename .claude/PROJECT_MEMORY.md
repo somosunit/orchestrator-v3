@@ -84,7 +84,7 @@
 - [x] Sistema de presets
 - [x] Cache local de agentes
 
-### v3.1 - Modularização (ATUAL)
+### v3.1 - Modularização
 
 - [x] Refatorar script em módulos (lib/, commands/)
 - [x] Validação de entrada em todos os comandos
@@ -95,6 +95,14 @@
 - [x] Shell completions
 - [x] Exemplos de tarefas (init-sample)
 - [x] Comandos de verificação (verify, pre-merge, report)
+
+### v3.2 - Gestão de Memória (ATUAL)
+
+- [x] Flags para update-memory (--bump, --changelog, --full)
+- [x] Incremento automático de versão
+- [x] Geração de changelog baseado em commits
+- [x] Fluxo de execução direta no CLAUDE.md
+- [x] Rotina obrigatória de update-memory após commits
 
 ### v4.0 - Futuro
 
@@ -139,6 +147,8 @@
 | Script monolítico | 3.1 | Modularização em lib/ e commands/ |
 | Sem validação | 3.1 | Criar lib/validation.sh |
 | Operações destrutivas | 3.1 | Criar função confirm() |
+| update-memory só timestamp | 3.2 | Adicionar --bump, --changelog, --full |
+| Sem fluxo para tarefas diretas | 3.2 | Documentar execução direta no CLAUDE.md |
 
 ## Lições Aprendidas
 
@@ -147,6 +157,7 @@
 3. **Redireção em for**: `for x in *.txt 2>/dev/null` é inválido
 4. **Escape em testes**: Usar aspas simples para strings literais
 5. **Modularização**: Facilita muito testes e manutenção
+6. **Memória após commits**: Sempre atualizar conteúdo da memória, não só timestamp!
 
 ## Próxima Sessão
 
@@ -155,6 +166,8 @@
 - [x] Modularização completa
 - [x] Testes automatizados
 - [x] Documentação atualizada
+- [x] update-memory com versionamento e changelog
+- [x] Fluxo de execução direta documentado
 
 ### Ideias Futuras
 
