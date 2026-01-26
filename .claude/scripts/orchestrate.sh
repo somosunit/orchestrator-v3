@@ -51,6 +51,8 @@ main() {
         # Inicialização
         init) cmd_init ;;
         init-sample) cmd_init_sample ;;
+        install-cli) cmd_install_cli "$@" ;;
+        uninstall-cli) cmd_uninstall_cli "$@" ;;
         doctor)
             if [[ "${1:-}" == "--fix" ]]; then
                 cmd_doctor_fix

@@ -22,6 +22,8 @@ AGENTES:
 INICIALIZAÇÃO:
   init                      Criar estrutura
   init-sample               Copiar exemplos de tarefas
+  install-cli [nome]        Instalar comando global (default: orch)
+  uninstall-cli [nome]      Remover comando global
   doctor                    Diagnosticar problemas
   doctor --fix              Corrigir problemas automaticamente
 

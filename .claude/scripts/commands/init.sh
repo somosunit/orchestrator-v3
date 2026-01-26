@@ -35,17 +35,109 @@ cmd_init() {
     echo ""
     echo -e "${CYAN}Próximos passos:${NC}"
     echo ""
-    echo "  1. Ver agentes disponíveis:"
+    echo "  1. Instalar CLI global (opcional):"
+    echo "     ${GREEN}$0 install-cli${NC}"
+    echo ""
+    echo "  2. Ver agentes disponíveis:"
     echo "     ${GREEN}$0 agents list${NC}"
     echo ""
-    echo "  2. Criar worktrees com agentes:"
+    echo "  3. Criar worktrees com agentes:"
     echo "     ${GREEN}$0 setup auth --preset auth${NC}"
     echo ""
-    echo "  3. Ou copiar um exemplo de tarefa:"
+    echo "  4. Ou copiar um exemplo de tarefa:"
     echo "     ${GREEN}$0 init-sample${NC}"
     echo ""
-    echo "  4. Verificar instalação:"
+    echo "  5. Verificar instalação:"
     echo "     ${GREEN}$0 doctor${NC}"
+}
+
+cmd_install_cli() {
+    local cli_name=${1:-"orch"}
+    local install_dir="/usr/local/bin"
+    local script_path="$SCRIPT_DIR/orchestrate.sh"
+    local link_path="$install_dir/$cli_name"
+
+    log_header "INSTALAR CLI"
+
+    # Verificar se o script existe
+    if [[ ! -f "$script_path" ]]; then
+        log_error "Script não encontrado: $script_path"
+        return 1
+    fi
+
+    # Verificar se já existe
+    if [[ -L "$link_path" ]]; then
+        local existing_target=$(readlink "$link_path")
+        if [[ "$existing_target" == "$script_path" ]]; then
+            log_success "CLI '$cli_name' já está instalado e aponta para o local correto"
+            return 0
+        else
+            log_warn "CLI '$cli_name' já existe mas aponta para: $existing_target"
+            if ! confirm "Deseja sobrescrever?"; then
+                log_info "Operação cancelada"
+                return 0
+            fi
+            sudo rm "$link_path"
+        fi
+    elif [[ -f "$link_path" ]]; then
+        log_error "'$link_path' já existe e não é um symlink"
+        log_info "Remova manualmente ou escolha outro nome"
+        return 1
+    fi
+
+    # Garantir que o script é executável
+    chmod +x "$script_path"
+
+    # Criar symlink
+    log_step "Criando symlink em $install_dir..."
+
+    if sudo ln -sf "$script_path" "$link_path"; then
+        log_success "CLI instalado com sucesso!"
+        echo ""
+        log_info "Agora você pode usar:"
+        echo ""
+        echo "  ${GREEN}$cli_name help${NC}"
+        echo "  ${GREEN}$cli_name status${NC}"
+        echo "  ${GREEN}$cli_name update-check${NC}"
+        echo ""
+    else
+        log_error "Falha ao criar symlink"
+        log_info "Verifique se você tem permissões sudo"
+        return 1
+    fi
+
+    return 0
+}
+
+cmd_uninstall_cli() {
+    local cli_name=${1:-"orch"}
+    local link_path="/usr/local/bin/$cli_name"
+
+    log_header "DESINSTALAR CLI"
+
+    if [[ ! -L "$link_path" ]]; then
+        if [[ -f "$link_path" ]]; then
+            log_error "'$link_path' existe mas não é um symlink"
+            return 1
+        else
+            log_warn "CLI '$cli_name' não está instalado"
+            return 0
+        fi
+    fi
+
+    if ! confirm "Remover CLI '$cli_name'?"; then
+        log_info "Operação cancelada"
+        return 0
+    fi
+
+    if sudo rm "$link_path"; then
+        log_success "CLI '$cli_name' removido com sucesso"
+    else
+        log_error "Falha ao remover CLI"
+        return 1
+    fi
+
+    return 0
 }
 
 cmd_init_sample() {
