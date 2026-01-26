@@ -1,7 +1,7 @@
 # Project Memory - Claude Orchestrator
 
-> **Última atualização**: 2026-01-26 10:11
-> **Versão**: 3.2
+> **Última atualização**: 2026-01-26 10:27
+> **Versão**: 3.3
 
 ## Visão Geral
 
@@ -42,6 +42,7 @@
 │   ├── status.sh           # status, status --json, wait
 │   ├── verify.sh           # verify, review, pre-merge, report
 │   ├── merge.sh            # merge, cleanup, memory
+│   ├── update.sh           # update, update-check
 │   └── help.sh             # help
 ├── tests/
 │   ├── test_runner.sh      # Framework de testes
@@ -96,13 +97,21 @@
 - [x] Exemplos de tarefas (init-sample)
 - [x] Comandos de verificação (verify, pre-merge, report)
 
-### v3.2 - Gestão de Memória (ATUAL)
+### v3.2 - Gestão de Memória
 
 - [x] Flags para update-memory (--bump, --changelog, --full)
 - [x] Incremento automático de versão
 - [x] Geração de changelog baseado em commits
 - [x] Fluxo de execução direta no CLAUDE.md
 - [x] Rotina obrigatória de update-memory após commits
+
+### v3.3 - Auto-Update (ATUAL)
+
+- [x] Comando `update` para atualizar do remote
+- [x] Comando `update-check` para verificar atualizações
+- [x] Backup automático antes de atualizar
+- [x] Rollback automático em caso de falha
+- [x] Verificação de integridade pós-update
 
 ### v4.0 - Futuro
 
@@ -168,6 +177,7 @@
 - [x] Documentação atualizada
 - [x] update-memory com versionamento e changelog
 - [x] Fluxo de execução direta documentado
+- [x] Comando update para auto-atualização
 
 ### Ideias Futuras
 
