@@ -1,6 +1,6 @@
 # Project Memory - Claude Orchestrator
 
-> **Última atualização**: 2026-01-26 10:27
+> **Última atualização**: 2026-01-26 10:40
 > **Versão**: 3.3
 
 ## Visão Geral
@@ -112,6 +112,8 @@
 - [x] Backup automático antes de atualizar
 - [x] Rollback automático em caso de falha
 - [x] Verificação de integridade pós-update
+- [x] Comando `install-cli` para criar atalho global
+- [x] Comando `uninstall-cli` para remover atalho
 
 ### v4.0 - Futuro
 
