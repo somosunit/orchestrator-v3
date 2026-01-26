@@ -1,17 +1,28 @@
-# Claude Orchestrator v3.1
+# Claude Orchestrator v3.3
 
 Sistema de orquestração de agentes Claude com **arquitetura modular** e **agentes especializados**.
 
-## Novidades da v3.1
+## Novidades
 
-- **Arquitetura Modular** - Script refatorado em lib/ e commands/
-- **Comando `doctor`** - Diagnóstico completo do sistema
-- **Validação de Entrada** - Nomes e parâmetros validados
-- **Confirmações** - Operações destrutivas pedem confirmação
-- **Output JSON** - `status --json` para automação
-- **Testes Automatizados** - Framework de testes incluído
-- **Shell Completions** - Bash completions disponíveis
-- **Exemplos de Tarefas** - `init-sample` copia exemplos
+### v3.3 - Auto-Update
+- **Comando `update`** - Atualiza orquestrador do remote
+- **Comando `update-check`** - Verifica atualizações disponíveis
+- **Comando `install-cli`** - Instala atalho global (`orch`)
+- **Backup automático** - Cria backup antes de atualizar
+- **Rollback** - Restaura automaticamente se falhar
+
+### v3.2 - Gestão de Memória
+- **`update-memory --bump`** - Incrementa versão automaticamente
+- **`update-memory --changelog`** - Gera changelog dos commits
+- **`update-memory --full`** - Bump + changelog
+
+### v3.1 - Modularização
+- Arquitetura modular (lib/ e commands/)
+- Comando `doctor` para diagnóstico
+- Validação de entrada
+- Output JSON (`status --json`)
+- Testes automatizados
+- Shell completions
 
 ## Instalação
 
@@ -22,41 +33,44 @@ cp orchestrator-v3/CLAUDE.md ~/seu-projeto/
 
 # Tornar executável
 chmod +x ~/seu-projeto/.claude/scripts/*.sh
-chmod +x ~/seu-projeto/.claude/scripts/tests/*.sh
 
 # Inicializar
 cd ~/seu-projeto
 .claude/scripts/orchestrate.sh init
 .claude/scripts/orchestrate.sh doctor
+
+# (Opcional) Instalar CLI global
+.claude/scripts/orchestrate.sh install-cli
+# Agora você pode usar: orch status, orch help, etc.
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Inicializar e diagnosticar
-.claude/scripts/orchestrate.sh init
-.claude/scripts/orchestrate.sh doctor
+# 1. Inicializar
+orch init
+orch doctor
 
 # 2. Criar worktrees com agentes
-.claude/scripts/orchestrate.sh setup auth --preset auth
-.claude/scripts/orchestrate.sh setup api --preset api
+orch setup auth --preset auth
+orch setup api --preset api
 
 # 3. Criar tarefas (ou copiar exemplos)
-.claude/scripts/orchestrate.sh init-sample
+orch init-sample
 
 # 4. Executar
-.claude/scripts/orchestrate.sh start
-.claude/scripts/orchestrate.sh status
-.claude/scripts/orchestrate.sh wait
+orch start
+orch status
+orch wait
 
 # 5. Verificar qualidade
-.claude/scripts/orchestrate.sh verify-all
-.claude/scripts/orchestrate.sh pre-merge
-.claude/scripts/orchestrate.sh report
+orch verify-all
+orch pre-merge
 
 # 6. Finalizar
-.claude/scripts/orchestrate.sh merge
-.claude/scripts/orchestrate.sh cleanup
+orch merge
+orch update-memory --full
+orch cleanup
 ```
 
 ## Presets de Agentes
@@ -73,6 +87,83 @@ cd ~/seu-projeto
 | `ml` | ml-engineer, ai-engineer, mlops-engineer | ML |
 | `security` | security-auditor, penetration-tester, security-engineer | Segurança |
 | `review` | code-reviewer, architect-reviewer, security-auditor | Review |
+
+## Comandos
+
+### Inicialização
+
+```bash
+orch init                    # Criar estrutura
+orch init-sample             # Copiar exemplos de tarefas
+orch install-cli [nome]      # Instalar CLI global (default: orch)
+orch uninstall-cli [nome]    # Remover CLI global
+orch doctor                  # Diagnosticar problemas
+orch doctor --fix            # Corrigir automaticamente
+```
+
+### Agentes
+
+```bash
+orch agents list               # Listar disponíveis
+orch agents installed          # Listar instalados
+orch agents install <agente>   # Instalar específico
+orch agents install-preset <p> # Instalar preset
+```
+
+### Execução
+
+```bash
+orch setup <nome> --preset <p>     # Criar worktree
+orch setup <nome> --agents a1,a2   # Com agentes específicos
+orch start                         # Iniciar todos
+orch start <agente>                # Iniciar específico
+orch stop <agente>                 # Parar
+orch restart <agente>              # Reiniciar
+```
+
+### Monitoramento
+
+```bash
+orch status            # Ver status (texto)
+orch status --json     # Ver status (JSON)
+orch wait              # Aguardar conclusão
+orch logs <agente>     # Ver logs
+orch follow <agente>   # Seguir logs
+```
+
+### Verificação
+
+```bash
+orch verify <worktree>   # Verificar worktree
+orch verify-all          # Verificar todas
+orch review <worktree>   # Criar review
+orch pre-merge           # Verificar antes do merge
+orch report              # Gerar relatório
+```
+
+### Finalização
+
+```bash
+orch merge               # Fazer merge
+orch cleanup             # Limpar (com confirmação)
+```
+
+### Memória
+
+```bash
+orch show-memory                  # Ver memória
+orch update-memory                # Atualizar timestamp
+orch update-memory --bump         # Incrementar versão
+orch update-memory --changelog    # Gerar changelog
+orch update-memory --full         # Bump + changelog
+```
+
+### Atualização
+
+```bash
+orch update-check    # Verificar se há atualizações
+orch update          # Atualizar do remote (com backup)
+```
 
 ## Estrutura
 
@@ -99,77 +190,15 @@ projeto/
 │   │   │   ├── status.sh
 │   │   │   ├── verify.sh
 │   │   │   ├── merge.sh
+│   │   │   ├── update.sh
 │   │   │   └── help.sh
-│   │   ├── tests/                     # Testes
-│   │   │   ├── test_runner.sh
-│   │   │   └── test_validation.sh
-│   │   └── completions/               # Shell completions
-│   │       └── orchestrate.bash
+│   │   ├── tests/
+│   │   └── completions/
 │   └── orchestration/
-│       ├── tasks/                     # Tarefas
-│       ├── examples/                  # Exemplos
-│       ├── logs/                      # Logs
-│       └── archive/                   # Histórico
-```
-
-## Comandos
-
-### Inicialização
-
-```bash
-orchestrate.sh init              # Criar estrutura
-orchestrate.sh init-sample       # Copiar exemplos de tarefas
-orchestrate.sh doctor            # Diagnosticar problemas
-orchestrate.sh doctor --fix      # Corrigir automaticamente
-```
-
-### Agentes
-
-```bash
-orchestrate.sh agents list               # Listar disponíveis
-orchestrate.sh agents installed          # Listar instalados
-orchestrate.sh agents install <agente>   # Instalar específico
-orchestrate.sh agents install-preset <p> # Instalar preset
-```
-
-### Execução
-
-```bash
-orchestrate.sh setup <nome> --preset <p>     # Criar worktree
-orchestrate.sh setup <nome> --agents a1,a2   # Com agentes específicos
-orchestrate.sh start                         # Iniciar todos
-orchestrate.sh start <agente>                # Iniciar específico
-orchestrate.sh stop <agente>                 # Parar
-orchestrate.sh restart <agente>              # Reiniciar
-```
-
-### Monitoramento
-
-```bash
-orchestrate.sh status            # Ver status (texto)
-orchestrate.sh status --json     # Ver status (JSON)
-orchestrate.sh wait              # Aguardar conclusão
-orchestrate.sh logs <agente>     # Ver logs
-orchestrate.sh follow <agente>   # Seguir logs
-```
-
-### Verificação e Qualidade
-
-```bash
-orchestrate.sh verify <worktree>   # Verificar worktree
-orchestrate.sh verify-all          # Verificar todas
-orchestrate.sh review <worktree>   # Criar review
-orchestrate.sh pre-merge           # Verificar antes do merge
-orchestrate.sh report              # Gerar relatório
-```
-
-### Finalização
-
-```bash
-orchestrate.sh merge             # Fazer merge
-orchestrate.sh cleanup           # Limpar (com confirmação)
-orchestrate.sh show-memory       # Ver memória
-orchestrate.sh update-memory     # Atualizar memória
+│       ├── tasks/
+│       ├── examples/
+│       ├── logs/
+│       └── .backups/                  # Backups do update
 ```
 
 ## Shell Completions
@@ -182,16 +211,11 @@ source /path/to/.claude/scripts/completions/orchestrate.bash
 ## Testes
 
 ```bash
-# Rodar todos os testes
 .claude/scripts/tests/test_runner.sh
-
-# Rodar testes específicos
-.claude/scripts/tests/test_runner.sh validation
 ```
 
 ## Fonte dos Agentes
 
-Agentes são baixados de:
 - [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents)
 
 ## Licença
