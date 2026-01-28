@@ -20,6 +20,9 @@ cmd_init() {
     # Criar ou resetar PROJECT_MEMORY.md
     _init_project_memory
 
+    # Configurar .gitignore
+    _init_gitignore
+
     # Criar exemplos se não existirem
     ensure_dir "$ORCHESTRATION_DIR/examples"
     create_example_tasks
@@ -166,6 +169,40 @@ cmd_init_sample() {
 # =============================================
 # HELPERS
 # =============================================
+
+_init_gitignore() {
+    local gitignore="$PROJECT_ROOT/.gitignore"
+    local marker="# Orchestrator (auto-generated)"
+    local entries=(
+        ""
+        "$marker"
+        ".claude/orchestration/logs/"
+        ".claude/orchestration/pids/"
+        ".claude/orchestration/status/"
+        ".claude/orchestration/archive/"
+        ".claude/orchestration/checkpoints/"
+        ".claude/orchestration/.recovery/"
+        ".claude/orchestration/.backups/"
+        ".claude/orchestration/EVENTS.md"
+        ".claude/agents/"
+        ".claude/PROJECT_MEMORY.md.orchestrator-backup"
+    )
+
+    # Se já tem o marcador, não adiciona novamente
+    if [[ -f "$gitignore" ]] && grep -q "$marker" "$gitignore" 2>/dev/null; then
+        log_info ".gitignore já configurado (mantendo)"
+        return 0
+    fi
+
+    log_step "Configurando .gitignore..."
+
+    # Adicionar entradas ao .gitignore
+    for entry in "${entries[@]}"; do
+        echo "$entry" >> "$gitignore"
+    done
+
+    log_success ".gitignore atualizado"
+}
 
 _init_project_memory() {
     # Se não existe, criar novo
